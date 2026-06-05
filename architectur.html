@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI FinOps Gateway — Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #060810;
+    --surface: #0d1117;
+    --surface2: #111827;
+    --surface3: #1a2236;
+    --border: #1e2d45;
+    --border2: #253550;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --accent5: #ef4444;
+    --accent6: #ec4899;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --glow: 0 0 30px rgba(0,212,255,0.15);
+    --glow2: 0 0 20px rgba(124,58,237,0.2);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1400px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header {
+    padding: 60px 0 40px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    width: 400px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .header-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 14px;
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 24px;
+    background: rgba(0,212,255,0.05);
+  }
+  .header-badge::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(36px, 5vw, 64px);
+    font-weight: 800;
+    line-height: 1.0;
+    letter-spacing: -0.03em;
+  }
+  h1 span { color: var(--accent); }
+  .header-sub {
+    margin-top: 16px;
+    color: var(--text2);
+    font-size: 16px;
+    max-width: 600px;
+    font-weight: 300;
+  }
+  .header-stats {
+    display: flex;
+    gap: 40px;
+    margin-top: 32px;
+  }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* NAV */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(6,8,16,0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+  }
+  .nav-inner {
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .nav-inner::-webkit-scrollbar { display: none; }
+  .nav-tab {
+    padding: 16px 24px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .nav-tab:hover { color: var(--text2); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* SECTIONS */
+  section { padding: 80px 0; border-bottom: 1px solid var(--border); }
+  .section-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+  .section-desc { color: var(--text2); max-width: 600px; margin-bottom: 48px; font-size: 15px; }
+
+  /* KILLER COMBO */
+  .killer-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .killer-card {
+    background: var(--surface);
+    padding: 32px;
+    position: relative;
+    transition: background 0.2s;
+  }
+  .killer-card:hover { background: var(--surface2); }
+  .killer-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .killer-card:hover::before { opacity: 1; }
+  .kc-1::before { background: var(--accent); }
+  .kc-2::before { background: var(--accent2); }
+  .kc-3::before { background: var(--accent3); }
+  .kc-4::before { background: var(--accent4); }
+  .kc-5::before { background: var(--accent5); }
+  .kc-6::before { background: var(--accent6); }
+  .killer-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    margin-bottom: 20px;
+  }
+  .killer-card h3 { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .killer-card p { color: var(--text2); font-size: 13px; line-height: 1.6; }
+  .killer-tag {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  /* ARCH DIAGRAM */
+  .arch-diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 48px;
+    position: relative;
+    overflow: hidden;
+  }
+  .arch-diagram::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(0,212,255,0.04) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Layers */
+  .layer {
+    border: 1px solid var(--border2);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .layer-header {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .layer-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .layer-body { padding: 20px; display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* Components */
+  .comp {
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid;
+    transition: transform 0.15s, box-shadow 0.15s;
+    cursor: default;
+    position: relative;
+  }
+  .comp:hover { transform: translateY(-2px); }
+  .comp-label { font-size: 10px; opacity: 0.6; display: block; margin-top: 2px; }
+
+  /* Client layer */
+  .layer-clients .layer-header { background: rgba(0,212,255,0.08); color: var(--accent); }
+  .layer-clients .layer-dot { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .layer-clients .comp { background: rgba(0,212,255,0.05); border-color: rgba(0,212,255,0.2); color: var(--accent); }
+
+  /* Gateway layer */
+  .layer-gateway .layer-header { background: rgba(124,58,237,0.1); color: var(--accent2); }
+  .layer-gateway .layer-dot { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+  .layer-gateway .comp { background: rgba(124,58,237,0.06); border-color: rgba(124,58,237,0.25); color: #a78bfa; }
+
+  /* Provider layer */
+  .layer-providers .layer-header { background: rgba(16,185,129,0.08); color: var(--accent3); }
+  .layer-providers .layer-dot { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+  .layer-providers .comp { background: rgba(16,185,129,0.05); border-color: rgba(16,185,129,0.2); color: var(--accent3); }
+
+  /* Data layer */
+  .layer-data .layer-header { background: rgba(245,158,11,0.08); color: var(--accent4); }
+  .layer-data .layer-dot { background: var(--accent4); box-shadow: 0 0 6px var(--accent4); }
+  .layer-data .comp { background: rgba(245,158,11,0.05); border-color: rgba(245,158,11,0.2); color: var(--accent4); }
+
+  /* Control layer */
+  .layer-control .layer-header { background: rgba(239,68,68,0.08); color: var(--accent5); }
+  .layer-control .layer-dot { background: var(--accent5); box-shadow: 0 0 6px var(--accent5); }
+  .layer-control .comp { background: rgba(239,68,68,0.05); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
+
+  /* Dashboard layer */
+  .layer-dash .layer-header { background: rgba(236,72,153,0.08); color: var(--accent6); }
+  .layer-dash .layer-dot { background: var(--accent6); box-shadow: 0 0 6px var(--accent6); }
+  .layer-dash .comp { background: rgba(236,72,153,0.05); border-color: rgba(236,72,153,0.2); color: #f9a8d4; }
+
+  /* Arrows between layers */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    gap: 8px;
+    color: var(--text3);
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .arrow-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border2), transparent);
+  }
+  .arrow-icon { font-size: 16px; color: var(--text3); }
+
+  /* REQUEST PIPELINE */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .pipeline-step {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    padding: 20px 0;
+    border-left: 1px solid var(--border);
+    padding-left: 28px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+  .pipeline-step:hover { border-left-color: var(--accent); }
+  .pipeline-step::before {
+    content: attr(data-step);
+    position: absolute;
+    left: -16px;
+    top: 20px;
+    width: 30px;
+    height: 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    transition: all 0.2s;
+  }
+  .pipeline-step:hover::before {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .step-body { flex: 1; }
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .step-desc { color: var(--text2); font-size: 13px; }
+  .step-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .step-tag {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .tag-ok { background: rgba(16,185,129,0.1); color: var(--accent3); border: 1px solid rgba(16,185,129,0.2); }
+  .tag-err { background: rgba(239,68,68,0.1); color: var(--accent5); border: 1px solid rgba(239,68,68,0.2); }
+  .tag-warn { background: rgba(245,158,11,0.1); color: var(--accent4); border: 1px solid rgba(245,158,11,0.2); }
+  .tag-info { background: rgba(0,212,255,0.08); color: var(--accent); border: 1px solid rgba(0,212,255,0.2); }
+  .tag-purple { background: rgba(124,58,237,0.1); color: #a78bfa; border: 1px solid rgba(124,58,237,0.2); }
+
+  /* ROADMAP */
+  .roadmap-timeline {
+    position: relative;
+    padding-left: 40px;
+  }
+  .roadmap-timeline::before {
+    content: '';
+    position: absolute;
+    left: 12px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--accent), var(--accent2), var(--accent3), var(--accent4));
+  }
+  .roadmap-version {
+    margin-bottom: 48px;
+    position: relative;
+  }
+  .roadmap-dot {
+    position: absolute;
+    left: -34px;
+    top: 6px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+  }
+  .v1 .roadmap-dot { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .v2 .roadmap-dot { background: var(--accent2); box-shadow: 0 0 10px var(--accent2); }
+  .v3 .roadmap-dot { background: var(--accent3); box-shadow: 0 0 10px var(--accent3); }
+  .v4 .roadmap-dot { background: var(--accent4); box-shadow: 0 0 10px var(--accent4); }
+
+  .version-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .version-badge {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .v1 .version-badge { color: var(--accent); }
+  .v2 .version-badge { color: var(--accent2); }
+  .v3 .version-badge { color: var(--accent3); }
+  .v4 .version-badge { color: var(--accent4); }
+
+  .version-title { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 600; }
+  .version-time {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 4px;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .feature-card:hover { transform: translateY(-2px); }
+  .v1 .feature-card:hover { border-color: rgba(0,212,255,0.3); }
+  .v2 .feature-card:hover { border-color: rgba(124,58,237,0.3); }
+  .v3 .feature-card:hover { border-color: rgba(16,185,129,0.3); }
+  .v4 .feature-card:hover { border-color: rgba(245,158,11,0.3); }
+  .feature-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .feature-desc { font-size: 12px; color: var(--text2); line-height: 1.5; }
+
+  /* TECH STACK */
+  .tech-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .tech-group { }
+  .tech-group-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text3);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tech-rows { display: flex; flex-direction: column; gap: 8px; }
+  .tech-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.2s;
+  }
+  .tech-row:hover { border-color: var(--border2); }
+  .tech-name { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 500; min-width: 120px; }
+  .tech-purpose { font-size: 12px; color: var(--text2); }
+  .tech-pill {
+    margin-left: auto;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+  .pill-go { background: rgba(0,212,255,0.1); color: var(--accent); }
+  .pill-node { background: rgba(16,185,129,0.1); color: var(--accent3); }
+  .pill-py { background: rgba(245,158,11,0.1); color: var(--accent4); }
+  .pill-infra { background: rgba(124,58,237,0.1); color: #a78bfa; }
+  .pill-db { background: rgba(239,68,68,0.1); color: var(--accent5); }
+
+  /* DLP WORKFLOW */
+  .workflow-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    margin-bottom: 16px;
+  }
+  .wf-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 120px;
+    padding: 0 12px;
+  }
+  .wf-box {
+    width: 100px;
+    padding: 14px 10px;
+    border-radius: 8px;
+    border: 1px solid;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    line-height: 1.4;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .wf-label { font-size: 10px; color: var(--text3); }
+  .wf-arrow { font-size: 18px; color: var(--text3); padding: 0 4px; margin-bottom: 20px; flex-shrink: 0; }
+  .wf-branch {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+  .wf-out {
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .out-block { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.25); color: var(--accent5); }
+  .out-redact { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: var(--accent4); }
+  .out-alert { background: rgba(124,58,237,0.08); border-color: rgba(124,58,237,0.25); color: #a78bfa; }
+  .out-pass { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: var(--accent3); }
+
+  /* Budget diagram */
+  .budget-flow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+  .budget-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  .budget-meter { margin: 16px 0; }
+  .meter-track {
+    height: 8px;
+    background: var(--surface3);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .meter-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease;
+  }
+  .meter-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+  .budget-status { font-size: 11px; margin-top: 8px; }
+  .status-ok { color: var(--accent3); }
+  .status-warn { color: var(--accent4); }
+  .status-err { color: var(--accent5); }
+
+  /* Agent registry */
+  .agent-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s, transform 0.15s;
+  }
+  .agent-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+  .agent-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+  .agent-avatar {
+    width: 38px; height: 38px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .agent-name { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; }
+  .agent-owner { font-size: 11px; color: var(--text3); }
+  .agent-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px; }
+  .tool-chip {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    background: rgba(0,212,255,0.06);
+    border: 1px solid rgba(0,212,255,0.15);
+    color: var(--accent);
+  }
+  .agent-meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+  .agent-status {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+  }
+  .agent-status::before { content: '●'; font-size: 6px; }
+  .status-active { color: var(--accent3); }
+  .status-active::before { color: var(--accent3); }
+  .status-paused { color: var(--accent4); }
+  .status-paused::before { color: var(--accent4); }
+
+  /* Chargeback */
+  .chargeback-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .chargeback-table th {
+    text-align: left;
+    padding: 10px 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+  }
+  .chargeback-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .chargeback-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .cb-cost { font-family: 'JetBrains Mono', monospace; color: var(--text); font-weight: 500; }
+  .cb-bar-cell { min-width: 120px; }
+  .cb-bar { height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+  .cb-fill { height: 100%; border-radius: 2px; }
+
+  /* Score cards */
+  .scorecard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .scorecard {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.15s;
+  }
+  .scorecard:hover { transform: translateY(-3px); }
+  .score-ring {
+    width: 80px; height: 80px;
+    margin: 0 auto 12px;
+    position: relative;
+  }
+  .score-ring svg { transform: rotate(-90deg); }
+  .score-num {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    transform: rotate(0deg);
+  }
+  .scorecard-name { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .scorecard-label { font-size: 11px; color: var(--text3); }
+
+  /* Footer */
+  footer {
+    padding: 48px 0;
+    text-align: center;
+    color: var(--text3);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  footer span { color: var(--accent); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .killer-grid { grid-template-columns: 1fr 1fr; }
+    .tech-sections { grid-template-columns: 1fr; }
+    .budget-flow { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .killer-grid { grid-template-columns: 1fr; }
+    .header-stats { flex-wrap: wrap; gap: 24px; }
+    .container { padding: 0 16px; }
+  }
+
+  /* Tooltip */
+  [data-tip] { position: relative; cursor: help; }
+  [data-tip]:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    font-family: 'DM Sans', sans-serif;
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  /* Smooth scroll */
+  html { scroll-behavior: smooth; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="container">
+    <div class="header-badge">AI-FINOPS-GATEWAY // ARCHITECTURE v1.0</div>
+    <h1>AI FinOps &amp;<br /><span>Governance</span> Gateway</h1>
+    <p class="header-sub">Enterprise-grade AI cost governance, DLP, policy enforcement, and observability — unified through a single gateway layer.</p>
+    <div class="header-stats">
+      <div class="stat"><span class="stat-num">4</span><span class="stat-label">Release Versions</span></div>
+      <div class="stat"><span class="stat-num">20+</span><span class="stat-label">Core Features</span></div>
+      <div class="stat"><span class="stat-num">&lt;15ms</span><span class="stat-label">Gateway Overhead</span></div>
+      <div class="stat"><span class="stat-num">6</span><span class="stat-label">Killer Capabilities</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <div class="container">
+    <div class="nav-inner">
+      <div class="nav-tab active" onclick="scrollTo('killer')">Killer Combo</div>
+      <div class="nav-tab" onclick="scrollTo('architecture')">Architecture</div>
+      <div class="nav-tab" onclick="scrollTo('pipeline')">Request Pipeline</div>
+      <div class="nav-tab" onclick="scrollTo('roadmap')">Roadmap</div>
+      <div class="nav-tab" onclick="scrollTo('dlp')">DLP Workflow</div>
+      <div class="nav-tab" onclick="scrollTo('budgets')">Budgets</div>
+      <div class="nav-tab" onclick="scrollTo('agents')">Agent Registry</div>
+      <div class="nav-tab" onclick="scrollTo('chargebacks')">Chargebacks</div>
+      <div class="nav-tab" onclick="scrollTo('techstack')">Tech Stack</div>
+    </div>
+  </div>
+</nav>
+
+<!-- KILLER COMBO -->
+<section id="killer">
+  <div class="container">
+    <div class="section-label">01 — Enterprise Adoption Core</div>
+    <h2>The Killer Combination</h2>
+    <p class="section-desc">Six irreducible capabilities that unlock enterprise adoption. Each solves a different stakeholder's pain: Engineering, Finance, Security, Compliance, and the CIO.</p>
+
+    <div class="killer-grid">
+      <div class="killer-card kc-1">
+        <div class="killer-icon" style="background:rgba(0,212,255,0.1)">🔀</div>
+        <h3>Gateway</h3>
+        <p>Single ingress point for all AI traffic. Drop-in OpenAI-compatible API. Full control and visibility over every model call, from every team and every agent.</p>
+        <span class="killer-tag" style="background:rgba(0,212,255,0.08);color:var(--accent);border:1px solid rgba(0,212,255,0.2)">V1 FOUNDATION</span>
+      </div>
+      <div class="killer-card kc-2">
+        <div class="killer-icon" style="background:rgba(124,58,237,0.1)">💰</div>
+        <h3>Budgets</h3>
+        <p>Monthly/weekly/daily budget caps per team, project, or user. Hard limits stop runaway spend. Soft threshold alerts give finance teams early warning at 80%.</p>
+        <span class="killer-tag" style="background:rgba(124,58,237,0.08);color:#a78bfa;border:1px solid rgba(124,58,237,0.2)">V2 GOVERNANCE</span>
+      </div>
+      <div class="killer-card kc-3">
+        <div class="killer-icon" style="background:rgba(16,185,129,0.1)">📋</div>
+        <h3>Prompt Audit</h3>
+        <p>Full immutable log of every request and response. Compliance teams can search, filter, and investigate any interaction. 90-day default retention with S3 archival.</p>
+        <span class="killer-tag" style="background:rgba(16,185,129,0.08);color:var(--accent3);border:1px solid rgba(16,185,129,0.2)">V1 FOUNDATION</span>
+      </div>
+      <div class="killer-card kc-4">
+        <div class="killer-icon" style="background:rgba(245,158,11,0.1)">🤖</div>
+        <h3>Agent Registry</h3>
+        <p>Every AI agent has an identity, an owner, and approved tools. Governance for agentic workflows — prevents autonomous agents from operating outside sanctioned boundaries.</p>
+        <span class="killer-tag" style="background:rgba(245,158,11,0.08);color:var(--accent4);border:1px solid rgba(245,158,11,0.2)">V3 AGENTS</span>
+      </div>
+      <div class="killer-card kc-5">
+        <div class="killer-icon" style="background:rgba(239,68,68,0.1)">🛡️</div>
+        <h3>DLP</h3>
+        <p>Scan every prompt for PII, API keys, financial data, and custom patterns before they reach external LLM providers. BLOCK, REDACT, or ALERT — configurable per team.</p>
+        <span class="killer-tag" style="background:rgba(239,68,68,0.08);color:var(--accent5);border:1px solid rgba(239,68,68,0.2)">V2 GOVERNANCE</span>
+      </div>
+      <div class="killer-card kc-6">
+        <div class="killer-icon" style="background:rgba(236,72,153,0.1)">📊</div>
+        <h3>Chargebacks</h3>
+        <p>Automated per-team, per-project cost allocation reports. Finance teams get P&amp;L-ready AI cost data. Export to CSV, PDF, or push to Workday / SAP via API.</p>
+        <span class="killer-tag" style="background:rgba(236,72,153,0.08);color:var(--accent6);border:1px solid rgba(236,72,153,0.2)">V2 GOVERNANCE</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="container">
+    <div class="section-label">02 — System Architecture</div>
+    <h2>Full-Stack Architecture</h2>
+    <p class="section-desc">Layered architecture from client applications down through the gateway, providers, data plane, and control plane to the dashboard.</p>
+
+    <div class="arch-diagram">
+      <!-- Clients -->
+      <div class="layer layer-clients">
+        <div class="layer-header"><div class="layer-dot"></div>CLIENT LAYER — Applications, Agents &amp; Developers</div>
+        <div class="layer-body">
+          <div class="comp" data-tip="Web & Mobile Apps using AI features">Web Apps<span class="comp-label">HTTP Client</span></div>
+          <div class="comp" data-tip="Autonomous AI agents in production">AI Agents<span class="comp-label">Agentic Workflows</span></div>
+          <div class="comp" data-tip="Internal tooling and scripts">Internal Tools<span class="comp-label">Scripts / SDKs</span></div>
+          <div class="comp" data-tip="Automated pipelines using LLMs">CI/CD Pipelines<span class="comp-label">Automated</span></div>
+          <div class="comp" data-tip="Individual developers testing">Developers<span class="comp-label">Local / Staging</span></div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><span class="arrow-icon">↓</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">HTTPS · Authorization: Bearer vk-xxxx · OpenAI-compatible</span><div class="arrow-line"></div></div>
+
+      <!-- Gateway -->
+      <div class="layer layer-gateway">
+        <div class="layer-header"><div class="layer-dot"></div>AI GATEWAY — Go (Core Proxy + Middleware Pipeline)</div>
+        <div class="layer-body">
+          <div class="comp" data-tip="Resolves virtual key to provider config">Virtual Key Resolver<span class="comp-label">Redis lookup</span></div>
+          <div class="comp" data-tip="Token-per-minute & req-per-minute limits">Rate Limiter<span class="comp-label">Redis counters</span></div>
+          <div class="comp" data-tip="PII/secret detection using Presidio">DLP Enforcer<span class="comp-label">Presidio / Python</span></div>
+          <div class="comp" data-tip="Declarative Rego policies via OPA">Policy Engine<span class="comp-label">OPA + Rego</span></div>
+          <div class="comp" data-tip="Hard/soft budget enforcement">Budget Guard<span class="comp-label">PostgreSQL</span></div>
+          <div class="comp" data-tip="Cost-based and latency-based routing">Smart Router<span class="comp-label">V3 Feature</span></div>
+          <div class="comp" data-tip="Streaming SSE passthrough to providers">Provider Proxy<span class="comp-label">SSE streaming</span></div>
+          <div class="comp" data-tip="Token extraction + async Kafka emit">Cost Interceptor<span class="comp-label">Kafka producer</span></div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><span class="arrow-icon">↓</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">HTTPS · Real API keys from Vault · Streaming SSE</span><div class="arrow-line"></div></div>
+
+      <!-- Providers -->
+      <div class="layer layer-providers">
+        <div class="layer-header"><div class="layer-dot"></div>LLM PROVIDERS — External AI Services</div>
+        <div class="layer-body">
+          <div class="comp">OpenAI<span class="comp-label">GPT-4o, o1, o3</span></div>
+          <div class="comp">Anthropic<span class="comp-label">Claude 3.x / 4.x</span></div>
+          <div class="comp">Azure OpenAI<span class="comp-label">Enterprise</span></div>
+          <div class="comp">Google Gemini<span class="comp-label">Gemini Pro/Flash</span></div>
+          <div class="comp">AWS Bedrock<span class="comp-label">Multi-model</span></div>
+          <div class="comp">Custom / OSS<span class="comp-label">Ollama, vLLM</span></div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><span class="arrow-icon">↓</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">Async — Kafka topics: prompt-logs, cost-events, dlp-alerts, agent-events</span><div class="arrow-line"></div></div>
+
+      <!-- Data Plane -->
+      <div class="layer layer-data">
+        <div class="layer-header"><div class="layer-dot"></div>DATA PLANE — Storage, Analytics &amp; Streaming</div>
+        <div class="layer-body">
+          <div class="comp" data-tip="High-throughput event streaming">Apache Kafka<span class="comp-label">Message bus</span></div>
+          <div class="comp" data-tip="Billions of cost events, sub-second queries">ClickHouse<span class="comp-label">Analytics / cost</span></div>
+          <div class="comp" data-tip="Users, teams, budgets, keys, agents">PostgreSQL<span class="comp-label">Primary datastore</span></div>
+          <div class="comp" data-tip="Virtual key hot cache, rate limiters">Redis<span class="comp-label">Cache / counters</span></div>
+          <div class="comp" data-tip="Raw prompt/response archival">S3 / MinIO<span class="comp-label">Object storage</span></div>
+          <div class="comp" data-tip="Full-text prompt search, DLP audit">OpenSearch<span class="comp-label">Search / audit</span></div>
+          <div class="comp" data-tip="Semantic similarity for prompt caching (V4)">pgvector<span class="comp-label">Vector store</span></div>
+          <div class="comp" data-tip="Async jobs: cost aggregation, alerts">BullMQ<span class="comp-label">Job queues</span></div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><span class="arrow-icon">↓</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">REST API — Node.js Admin API (control plane)</span><div class="arrow-line"></div></div>
+
+      <!-- Control Plane -->
+      <div class="layer layer-control">
+        <div class="layer-header"><div class="layer-dot"></div>CONTROL PLANE — Admin API (Node.js + Fastify)</div>
+        <div class="layer-body">
+          <div class="comp">/api/v1/keys<span class="comp-label">Virtual key CRUD</span></div>
+          <div class="comp">/api/v1/budgets<span class="comp-label">Budget management</span></div>
+          <div class="comp">/api/v1/teams<span class="comp-label">Org hierarchy</span></div>
+          <div class="comp">/api/v1/policies<span class="comp-label">OPA rule management</span></div>
+          <div class="comp">/api/v1/agents<span class="comp-label">Agent registry</span></div>
+          <div class="comp">/api/v1/chargebacks<span class="comp-label">Cost allocation</span></div>
+          <div class="comp">/api/v1/analytics<span class="comp-label">ClickHouse queries</span></div>
+          <div class="comp">/api/v1/dlp<span class="comp-label">Policy &amp; alerts</span></div>
+          <div class="comp">/api/v1/forecasts<span class="comp-label">V4 — predictions</span></div>
+        </div>
+      </div>
+
+      <div class="flow-arrow"><div class="arrow-line"></div><span class="arrow-icon">↓</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text3)">Next.js 14 App Router — SSR Dashboard</span><div class="arrow-line"></div></div>
+
+      <!-- Dashboard -->
+      <div class="layer layer-dash">
+        <div class="layer-header"><div class="layer-dot"></div>DASHBOARD — Next.js 14 (App Router + shadcn/ui)</div>
+        <div class="layer-body">
+          <div class="comp">Cost Dashboard<span class="comp-label">Recharts</span></div>
+          <div class="comp">Prompt Logs<span class="comp-label">TanStack Table</span></div>
+          <div class="comp">Budget Manager<span class="comp-label">Live meters</span></div>
+          <div class="comp">DLP Alerts<span class="comp-label">OpenSearch</span></div>
+          <div class="comp">Policy Editor<span class="comp-label">OPA Rego UI</span></div>
+          <div class="comp">Agent Console<span class="comp-label">V3</span></div>
+          <div class="comp">Chargebacks<span class="comp-label">Export CSV/PDF</span></div>
+          <div class="comp">AI Scorecards<span class="comp-label">V4</span></div>
+          <div class="comp">Forecasting<span class="comp-label">V4</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REQUEST PIPELINE -->
+<section id="pipeline">
+  <div class="container">
+    <div class="section-label">03 — Per-Request Flow</div>
+    <h2>Request Pipeline</h2>
+    <p class="section-desc">Every API call passes through an ordered middleware chain. Each step can accept, reject, or modify the request before it reaches the upstream LLM provider.</p>
+
+    <div class="pipeline">
+      <div class="pipeline-step" data-step="01">
+        <div class="step-body">
+          <div class="step-title">TLS Termination + NGINX Ingress</div>
+          <div class="step-desc">All requests arrive over HTTPS. NGINX handles TLS termination, load balancing across gateway replicas, and basic rate limiting at the network edge.</div>
+          <div class="step-tags"><span class="step-tag tag-info">NGINX</span><span class="step-tag tag-info">TLS 1.3</span><span class="step-tag tag-info">Kubernetes Ingress</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="02">
+        <div class="step-body">
+          <div class="step-title">Virtual Key Authentication</div>
+          <div class="step-desc">Extract <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent)">Authorization: Bearer vk-xxxx</code> header. SHA-256 hash the key and look up in Redis hot cache (fallback to PostgreSQL). Resolve to: provider, model allowlist, team, user, rate limits, DLP policy.</div>
+          <div class="step-tags"><span class="step-tag tag-ok">Cache hit &lt;1ms</span><span class="step-tag tag-err">404 → 401 Unauthorized</span><span class="step-tag tag-err">Revoked → 401</span><span class="step-tag tag-info">Redis</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="03">
+        <div class="step-body">
+          <div class="step-title">Rate Limit Check</div>
+          <div class="step-desc">Check tokens-per-minute and requests-per-minute against sliding window counters in Redis. Per-key, per-user, and per-team limits are all enforced independently.</div>
+          <div class="step-tags"><span class="step-tag tag-err">Exceeded → 429 Too Many Requests</span><span class="step-tag tag-info">Sliding window</span><span class="step-tag tag-info">Redis INCR</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="04">
+        <div class="step-body">
+          <div class="step-title">DLP Scan (Data Loss Prevention)</div>
+          <div class="step-desc">Send prompt text to the Python DLP microservice (Microsoft Presidio). Detect PII, credentials, financial data, and custom org-defined patterns. Policy lookup determines action: BLOCK, REDACT, ALERT, or ALLOW.</div>
+          <div class="step-tags"><span class="step-tag tag-err">BLOCK → 400 + Kafka alert</span><span class="step-tag tag-warn">REDACT → scrub + continue</span><span class="step-tag tag-purple">ALERT → continue + log</span><span class="step-tag tag-info">Presidio</span><span class="step-tag tag-info">&lt;5ms target</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="05">
+        <div class="step-body">
+          <div class="step-title">OPA Policy Evaluation</div>
+          <div class="step-desc">Evaluate declarative Rego policies: allowed models, time-of-day restrictions, geographic origin, content classifications, required prompt prefixes. All policies are versioned and auditable.</div>
+          <div class="step-tags"><span class="step-tag tag-err">DENY → 403 Forbidden</span><span class="step-tag tag-ok">ALLOW → continue</span><span class="step-tag tag-info">OPA</span><span class="step-tag tag-info">Rego policies</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="06">
+        <div class="step-body">
+          <div class="step-title">Budget Check</div>
+          <div class="step-desc">Query current budget utilization for the team/user/project. Estimate token cost of the incoming request. Hard limit: reject if budget is exhausted. Soft limit: continue but send alert via BullMQ to notification queue.</div>
+          <div class="step-tags"><span class="step-tag tag-err">Hard limit → 402 Payment Required</span><span class="step-tag tag-warn">Soft limit → alert + continue</span><span class="step-tag tag-info">PostgreSQL + BullMQ</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="07">
+        <div class="step-body">
+          <div class="step-title">Smart Router (V3)</div>
+          <div class="step-desc">Select the optimal provider and model based on: real-time latency, cost per token, model capability tier, fallback chains, and optional A/B split configuration. Can substitute cheaper models for eligible request types.</div>
+          <div class="step-tags"><span class="step-tag tag-ok">Cost-optimized routing</span><span class="step-tag tag-ok">Latency-based</span><span class="step-tag tag-warn">Fallback chains</span><span class="step-tag tag-purple">A/B splits</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="08">
+        <div class="step-body">
+          <div class="step-title">Provider Proxy + Response Streaming</div>
+          <div class="step-desc">Forward the request to the selected provider using the real API key retrieved from HashiCorp Vault. Stream SSE tokens back to the client in real time. Intercept the final <code style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent)">usage</code> object from the response.</div>
+          <div class="step-tags"><span class="step-tag tag-ok">SSE streaming</span><span class="step-tag tag-info">Vault key injection</span><span class="step-tag tag-info">Usage extraction</span></div>
+        </div>
+      </div>
+
+      <div class="pipeline-step" data-step="09">
+        <div class="step-body">
+          <div class="step-title">Async: Kafka Emit + Cost Aggregation</div>
+          <div class="step-desc">After response: emit cost event to Kafka (non-blocking). Workers consume and write to ClickHouse (analytics) and increment PostgreSQL budget counters. Prompt + response archived to S3. DLP alerts sent to OpenSearch.</div>
+          <div class="step-tags"><span class="step-tag tag-info">Kafka</span><span class="step-tag tag-info">ClickHouse</span><span class="step-tag tag-info">S3 archive</span><span class="step-tag tag-ok">Non-blocking</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="container">
+    <div class="section-label">04 — Versioned Roadmap</div>
+    <h2>V1 → V4 Roadmap</h2>
+    <p class="section-desc">Four release phases taking the platform from foundational observability to intelligent AI cost optimization, each building on the last.</p>
+
+    <div class="roadmap-timeline">
+
+      <!-- V1 -->
+      <div class="roadmap-version v1">
+        <div class="roadmap-dot"></div>
+        <div class="version-header">
+          <span class="version-badge">V1</span>
+          <span class="version-title">Foundation — Observable &amp; Governed</span>
+          <span class="version-time">Weeks 1–10</span>
+        </div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">Replace direct provider API key usage with a governed, observable gateway. Every AI call flows through one point. Finance and engineering get immediate cost visibility.</p>
+        <div class="feature-grid">
+          <div class="feature-card"><div class="feature-name">🔀 Gateway</div><div class="feature-desc">Go reverse proxy. OpenAI-compatible /v1 endpoint. Sub-15ms overhead. Full SSE streaming support.</div></div>
+          <div class="feature-card"><div class="feature-name">🔑 Virtual Keys</div><div class="feature-desc">Create, revoke, rotate keys. Bind to users, teams, projects. Redis hot-cache for sub-ms resolution.</div></div>
+          <div class="feature-card"><div class="feature-name">🌐 Providers</div><div class="feature-desc">OpenAI, Anthropic, Azure OpenAI, Gemini. Extensible provider interface for custom models.</div></div>
+          <div class="feature-card"><div class="feature-name">📋 Prompt Logs</div><div class="feature-desc">Full request/response capture via Kafka → ClickHouse. S3 archival. Search in OpenSearch.</div></div>
+          <div class="feature-card"><div class="feature-name">💲 Cost Tracking</div><div class="feature-desc">Per-request token cost. Roll-up by user, model, day. Live dashboard. CSV export.</div></div>
+          <div class="feature-card"><div class="feature-name">👤 User Management</div><div class="feature-desc">RBAC: Admin / Developer / Analyst / Viewer. SSO via OAuth2 / SAML. Okta & Azure AD support.</div></div>
+        </div>
+      </div>
+
+      <!-- V2 -->
+      <div class="roadmap-version v2">
+        <div class="roadmap-dot"></div>
+        <div class="version-header">
+          <span class="version-badge">V2</span>
+          <span class="version-title">Governance — Finance &amp; Security Controls</span>
+          <span class="version-time">Weeks 11–20</span>
+        </div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">Give Finance the controls to manage AI spend and give Security the tools to prevent data leakage. Unlock enterprise budget cycles and compliance requirements.</p>
+        <div class="feature-grid">
+          <div class="feature-card"><div class="feature-name">💰 Budgets</div><div class="feature-desc">Monthly/weekly/daily budget caps. Hard limits block requests. Soft threshold alerts at 80%. Per-team, per-project, per-user scopes.</div></div>
+          <div class="feature-card"><div class="feature-name">🏢 Teams</div><div class="feature-desc">Org → Department → Team → Project hierarchy. Inherit budget policies. Nested reporting.</div></div>
+          <div class="feature-card"><div class="feature-name">📊 Chargebacks</div><div class="feature-desc">Automated cost allocation reports. Per-team P&amp;L attribution. CSV, PDF, API export for Workday/SAP.</div></div>
+          <div class="feature-card"><div class="feature-name">🛡️ DLP</div><div class="feature-desc">Presidio-based PII/secret detection. BLOCK / REDACT / ALERT / ALLOW policies. Custom entity patterns.</div></div>
+          <div class="feature-card"><div class="feature-name">📜 Governance Policies</div><div class="feature-desc">OPA + Rego: allowed models, time windows, geo restrictions, content filters. Version-controlled policy-as-code.</div></div>
+        </div>
+      </div>
+
+      <!-- V3 -->
+      <div class="roadmap-version v3">
+        <div class="roadmap-dot"></div>
+        <div class="version-header">
+          <span class="version-badge">V3</span>
+          <span class="version-title">Agent &amp; Tool Governance</span>
+          <span class="version-time">Weeks 21–32</span>
+        </div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">The agentic AI era demands new governance primitives. Every agent has an identity, an owner, and approved tools. No autonomous agent operates outside sanctioned boundaries.</p>
+        <div class="feature-grid">
+          <div class="feature-card"><div class="feature-name">🤖 Agent Registry</div><div class="feature-desc">Register agents: name, owner, team, allowed tools, cost ceiling. Agent identity tied to a Virtual Key. Full audit trail.</div></div>
+          <div class="feature-card"><div class="feature-name">🔧 Tool Governance</div><div class="feature-desc">Approve/deny tool access per agent. Require human-in-the-loop for sensitive tools. Audit every tool invocation.</div></div>
+          <div class="feature-card"><div class="feature-name">🗂️ AI Inventory</div><div class="feature-desc">Auto-discover AI usage across the org. Surface shadow AI. Build a complete picture of all models in production.</div></div>
+          <div class="feature-card"><div class="feature-name">⚡ Smart Routing</div><div class="feature-desc">Route to cheapest/fastest model per SLA. Fallback chains on provider errors. A/B split for model evaluation.</div></div>
+        </div>
+      </div>
+
+      <!-- V4 -->
+      <div class="roadmap-version v4">
+        <div class="roadmap-dot"></div>
+        <div class="version-header">
+          <span class="version-badge">V4</span>
+          <span class="version-title">Intelligence &amp; Optimization</span>
+          <span class="version-time">Weeks 33–44</span>
+        </div>
+        <p style="color:var(--text2);font-size:13px;margin-bottom:16px">Use the rich telemetry data from V1–V3 to build intelligent forecasts, semantic caches, and quality scorecards that make AI usage smarter and cheaper.</p>
+        <div class="feature-grid">
+          <div class="feature-card"><div class="feature-name">📈 Forecasting</div><div class="feature-desc">30/60/90-day spend forecasts using Prophet/ARIMA on ClickHouse data. Anomaly detection. Budget overage alerts before they happen.</div></div>
+          <div class="feature-card"><div class="feature-name">⚙️ Cost Optimization</div><div class="feature-desc">Semantic prompt caching via pgvector (target: 20%+ cache hit rate). Model downgrade suggestions for eligible request patterns.</div></div>
+          <div class="feature-card"><div class="feature-name">📝 Prompt Versioning</div><div class="feature-desc">Version-controlled prompts with diff viewer. A/B test framework: compare cost, latency, and output quality across prompt versions.</div></div>
+          <div class="feature-card"><div class="feature-name">🏆 AI Scorecards</div><div class="feature-desc">Monthly quality + cost + latency health scores per team. Executive dashboards. Trend analysis. Benchmarked against org-wide averages.</div></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- DLP WORKFLOW -->
+<section id="dlp">
+  <div class="container">
+    <div class="section-label">05 — Data Loss Prevention</div>
+    <h2>DLP Workflow</h2>
+    <p class="section-desc">Every prompt is scanned for sensitive data before it reaches an external LLM provider. Policy determines the response — from silent pass-through to full request block.</p>
+
+    <div class="workflow-flow">
+      <div class="wf-node">
+        <div class="wf-box" style="background:rgba(0,212,255,0.06);border-color:rgba(0,212,255,0.2);color:var(--accent)">Incoming<br/>Prompt</div>
+        <div class="wf-label">user message</div>
+      </div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-node">
+        <div class="wf-box" style="background:rgba(124,58,237,0.06);border-color:rgba(124,58,237,0.2);color:#a78bfa">Presidio<br/>Analyzer</div>
+        <div class="wf-label">entity detection</div>
+      </div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-node">
+        <div class="wf-box" style="background:rgba(245,158,11,0.06);border-color:rgba(245,158,11,0.2);color:var(--accent4)">Policy<br/>Lookup</div>
+        <div class="wf-label">per key / team</div>
+      </div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-node" style="min-width:180px">
+        <div class="wf-branch">
+          <div class="wf-out out-block">🚫 BLOCK → 400 + Alert</div>
+          <div class="wf-out out-redact">✂️ REDACT → scrub + continue</div>
+          <div class="wf-out out-alert">🔔 ALERT → log + continue</div>
+          <div class="wf-out out-pass">✅ ALLOW → pass through</div>
+        </div>
+        <div class="wf-label">action applied</div>
+      </div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-node">
+        <div class="wf-box" style="background:rgba(16,185,129,0.06);border-color:rgba(16,185,129,0.2);color:var(--accent3)">Kafka<br/>DLP Topic</div>
+        <div class="wf-label">audit trail</div>
+      </div>
+      <div class="wf-arrow">→</div>
+      <div class="wf-node">
+        <div class="wf-box" style="background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.2);color:var(--accent5)">OpenSearch<br/>Audit Log</div>
+        <div class="wf-label">searchable</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:20px">
+      <div style="padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:8px">DETECTED ENTITIES</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <span class="tool-chip">PERSON</span><span class="tool-chip">EMAIL</span><span class="tool-chip">PHONE</span><span class="tool-chip">SSN</span><span class="tool-chip">CREDIT_CARD</span><span class="tool-chip">API_KEY</span><span class="tool-chip">AWS_KEY</span><span class="tool-chip">IBAN</span><span class="tool-chip">IP_ADDRESS</span><span class="tool-chip">CUSTOM</span>
+        </div>
+      </div>
+      <div style="padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:8px">LATENCY TARGET</div>
+        <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--accent3)">&lt;5ms</div>
+        <div style="font-size:12px;color:var(--text2)">DLP scan overhead added to total gateway latency</div>
+      </div>
+      <div style="padding:16px;background:var(--surface);border:1px solid var(--border);border-radius:8px">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:8px">RETENTION</div>
+        <div style="font-family:'Syne',sans-serif;font-size:28px;font-weight:800;color:var(--accent4)">90 days</div>
+        <div style="font-size:12px;color:var(--text2)">Default DLP alert retention in OpenSearch, configurable per org</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BUDGETS -->
+<section id="budgets">
+  <div class="container">
+    <div class="section-label">06 — Budget Enforcement</div>
+    <h2>Budget System</h2>
+    <p class="section-desc">Real-time budget tracking with hard enforcement at the gateway layer. Finance teams see live utilization. Engineers get automatic cut-offs before overspend happens.</p>
+
+    <div class="budget-flow">
+      <div class="budget-card">
+        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px">Engineering Team</div>
+        <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Monthly · Hard Limit</div>
+        <div class="budget-meter">
+          <div class="meter-track"><div class="meter-fill" style="width:72%;background:linear-gradient(90deg,var(--accent3),var(--accent))"></div></div>
+          <div class="meter-labels"><span>$0</span><span>$3,600 / $5,000</span></div>
+        </div>
+        <div class="budget-status status-ok">● 72% used — on track</div>
+      </div>
+      <div class="budget-card">
+        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px">Data Science Team</div>
+        <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Monthly · Soft Limit Alert</div>
+        <div class="budget-meter">
+          <div class="meter-track"><div class="meter-fill" style="width:88%;background:linear-gradient(90deg,var(--accent4),#f97316)"></div></div>
+          <div class="meter-labels"><span>$0</span><span>$8,800 / $10,000</span></div>
+        </div>
+        <div class="budget-status status-warn">⚠ 88% used — alert sent</div>
+      </div>
+      <div class="budget-card">
+        <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:4px">Product Team</div>
+        <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">Monthly · Hard Limit</div>
+        <div class="budget-meter">
+          <div class="meter-track"><div class="meter-fill" style="width:100%;background:linear-gradient(90deg,var(--accent5),#dc2626)"></div></div>
+          <div class="meter-labels"><span>$0</span><span>$2,000 / $2,000</span></div>
+        </div>
+        <div class="budget-status status-err">🚫 100% — requests blocked (402)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AGENT REGISTRY -->
+<section id="agents">
+  <div class="container">
+    <div class="section-label">07 — V3 Agent Governance</div>
+    <h2>Agent Registry</h2>
+    <p class="section-desc">Every autonomous AI agent in your organization is registered, owned, and governed. No agent operates without approved tools, a human owner, and a cost ceiling.</p>
+
+    <div class="agent-cards">
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-avatar" style="background:rgba(0,212,255,0.1)">🔍</div>
+          <div>
+            <div class="agent-name">research-agent-v2</div>
+            <div class="agent-owner">Owner: alice@corp.com · Data Science</div>
+          </div>
+        </div>
+        <div class="agent-tools">
+          <span class="tool-chip">web_search</span><span class="tool-chip">code_exec</span><span class="tool-chip">file_read</span>
+        </div>
+        <div class="agent-meta">
+          <span>$0.82 today</span>
+          <span class="agent-status status-active">active</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-avatar" style="background:rgba(16,185,129,0.1)">💻</div>
+          <div>
+            <div class="agent-name">code-review-bot</div>
+            <div class="agent-owner">Owner: bob@corp.com · Engineering</div>
+          </div>
+        </div>
+        <div class="agent-tools">
+          <span class="tool-chip">github_api</span><span class="tool-chip">code_exec</span>
+        </div>
+        <div class="agent-meta">
+          <span>$3.41 today</span>
+          <span class="agent-status status-active">active</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-avatar" style="background:rgba(245,158,11,0.1)">📄</div>
+          <div>
+            <div class="agent-name">doc-summarizer</div>
+            <div class="agent-owner">Owner: carol@corp.com · Product</div>
+          </div>
+        </div>
+        <div class="agent-tools">
+          <span class="tool-chip">file_read</span><span class="tool-chip">confluence_api</span>
+        </div>
+        <div class="agent-meta">
+          <span>$0.18 today</span>
+          <span class="agent-status status-paused">paused</span>
+        </div>
+      </div>
+      <div class="agent-card">
+        <div class="agent-header">
+          <div class="agent-avatar" style="background:rgba(236,72,153,0.1)">📧</div>
+          <div>
+            <div class="agent-name">email-drafter</div>
+            <div class="agent-owner">Owner: dave@corp.com · Sales</div>
+          </div>
+        </div>
+        <div class="agent-tools">
+          <span class="tool-chip">gmail_send</span><span class="tool-chip">crm_read</span>
+        </div>
+        <div class="agent-meta">
+          <span>$1.05 today</span>
+          <span class="agent-status status-active">active</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHARGEBACKS -->
+<section id="chargebacks">
+  <div class="container">
+    <div class="section-label">08 — Cost Allocation</div>
+    <h2>Chargeback Report</h2>
+    <p class="section-desc">Monthly per-team AI cost allocation, automatically generated from ClickHouse usage data. Exportable to CSV, PDF, or pushed to finance systems via API.</p>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+      <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="font-family:'Syne',sans-serif;font-size:15px;font-weight:600">June 2025 — Chargeback Report</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;font-family:'JetBrains Mono',monospace">Auto-generated · 12 teams · $47,382.40 total</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <span style="padding:6px 14px;border:1px solid var(--border2);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2);cursor:pointer">Export CSV</span>
+          <span style="padding:6px 14px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);cursor:pointer">Export PDF</span>
+        </div>
+      </div>
+      <table class="chargeback-table">
+        <thead>
+          <tr><th>Team</th><th>Department</th><th>Top Model</th><th>Tokens (M)</th><th>Cost USD</th><th>% of Total</th><th>vs Last Month</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Data Science</td><td>Research</td><td>gpt-4o</td><td>142.3</td><td class="cb-cost">$14,230.00</td><td class="cb-bar-cell">30.1%<div class="cb-bar"><div class="cb-fill" style="width:100%;background:var(--accent)"></div></div></td><td style="color:var(--accent5)">↑ +22%</td></tr>
+          <tr><td>Engineering</td><td>Product</td><td>claude-3-5-sonnet</td><td>98.7</td><td class="cb-cost">$9,870.00</td><td class="cb-bar-cell">20.8%<div class="cb-bar"><div class="cb-fill" style="width:69%;background:var(--accent2)"></div></div></td><td style="color:var(--accent4)">↑ +8%</td></tr>
+          <tr><td>Sales Ops</td><td>Revenue</td><td>gpt-4o-mini</td><td>87.2</td><td class="cb-cost">$8,720.00</td><td class="cb-bar-cell">18.4%<div class="cb-bar"><div class="cb-fill" style="width:61%;background:var(--accent3)"></div></div></td><td style="color:var(--accent3)">↓ -3%</td></tr>
+          <tr><td>Customer Success</td><td>Operations</td><td>gpt-4o-mini</td><td>72.1</td><td class="cb-cost">$7,210.00</td><td class="cb-bar-cell">15.2%<div class="cb-bar"><div class="cb-fill" style="width:51%;background:var(--accent4)"></div></div></td><td style="color:var(--accent4)">↑ +11%</td></tr>
+          <tr><td>Marketing</td><td>Growth</td><td>claude-3-haiku</td><td>41.8</td><td class="cb-cost">$4,180.00</td><td class="cb-bar-cell">8.8%<div class="cb-bar"><div class="cb-fill" style="width:29%;background:var(--accent6)"></div></div></td><td style="color:var(--accent3)">↓ -14%</td></tr>
+          <tr><td>Other Teams (7)</td><td>Various</td><td>mixed</td><td>31.7</td><td class="cb-cost">$3,172.40</td><td class="cb-bar-cell">6.7%<div class="cb-bar"><div class="cb-fill" style="width:22%;background:var(--text3)"></div></div></td><td style="color:var(--text3)">— flat</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section id="techstack">
+  <div class="container">
+    <div class="section-label">09 — Technology Choices</div>
+    <h2>Tech Stack</h2>
+    <p class="section-desc">Every technology choice is deliberate. Go for the hot path. ClickHouse for analytics at scale. OPA for auditable policy-as-code. Presidio for battle-tested PII detection.</p>
+
+    <div class="tech-sections">
+      <div class="tech-group">
+        <div class="tech-group-title">Core Services</div>
+        <div class="tech-rows">
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent)">Go (Golang)</span><span class="tech-purpose">AI Gateway — low-latency proxying, goroutine concurrency, streaming SSE</span><span class="tech-pill pill-go">GATEWAY</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent3)">Node.js + Fastify</span><span class="tech-purpose">Admin API — control plane, JSON-native, plugin ecosystem</span><span class="tech-pill pill-node">API</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent4)">Python + Presidio</span><span class="tech-purpose">DLP Service — Microsoft's PII detection engine, custom entity support</span><span class="tech-pill pill-py">DLP</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:#a78bfa">OPA + Rego</span><span class="tech-purpose">Policy Engine — declarative, auditable, language-agnostic governance rules</span><span class="tech-pill pill-infra">POLICY</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent3)">Next.js 14</span><span class="tech-purpose">Dashboard — App Router, SSR, shadcn/ui, TanStack Query + Table</span><span class="tech-pill pill-node">UI</span></div>
+        </div>
+      </div>
+      <div class="tech-group">
+        <div class="tech-group-title">Data &amp; Infrastructure</div>
+        <div class="tech-rows">
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent5)">ClickHouse</span><span class="tech-purpose">Cost analytics — billions of rows, sub-second aggregations, MergeTree engine</span><span class="tech-pill pill-db">ANALYTICS</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent5)">PostgreSQL v16</span><span class="tech-purpose">Primary datastore — users, budgets, keys, agents, ACID transactions</span><span class="tech-pill pill-db">PRIMARY DB</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent5)">Redis v7</span><span class="tech-purpose">Hot cache for key resolution, sliding window rate limits, session state</span><span class="tech-pill pill-db">CACHE</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:var(--accent4)">Apache Kafka</span><span class="tech-purpose">Message bus — durable prompt log streaming, cost events, DLP alerts</span><span class="tech-pill pill-infra">STREAMING</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:#a78bfa">Kubernetes + Helm</span><span class="tech-purpose">Container orchestration, HPA for gateway, GitOps via ArgoCD</span><span class="tech-pill pill-infra">INFRA</span></div>
+          <div class="tech-row"><span class="tech-name" style="color:#a78bfa">HashiCorp Vault</span><span class="tech-purpose">Real API key storage — never in DB or env vars, dynamic secrets</span><span class="tech-pill pill-infra">SECRETS</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <p>AI FinOps &amp; Governance Gateway · Architecture Document<br/>
+    Built for <span>enterprise AI governance</span> · Every token tracked · Every policy enforced · Every cost attributed</p>
+  </div>
+</footer>
+
+<script>
+  function scrollTo(id) {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+
+  // Update nav active state on scroll
+  const sections = ['killer','architecture','pipeline','roadmap','dlp','budgets','agents','chargebacks','techstack'];
+  const tabs = document.querySelectorAll('.nav-tab');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        const idx = sections.indexOf(e.target.id);
+        if (idx >= 0) {
+          tabs.forEach(t => t.classList.remove('active'));
+          tabs[idx]?.classList.add('active');
+        }
+      }
+    });
+  }, { threshold: 0.3 });
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) observer.observe(el);
+  });
+
+  // Animate meter fills on page load
+  window.addEventListener('load', () => {
+    document.querySelectorAll('.meter-fill').forEach(el => {
+      const target = el.style.width;
+      el.style.width = '0';
+      setTimeout(() => { el.style.width = target; }, 400);
+    });
+  });
+</script>
+</body>
+</html>

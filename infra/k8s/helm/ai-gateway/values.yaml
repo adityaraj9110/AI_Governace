@@ -1,0 +1,150 @@
+# ============================================
+# AI Gateway — Helm Values (Default)
+# ============================================
+
+# ── Namespace ──
+namespace: ai-gateway
+
+# ── Gateway (Go) ──
+gateway:
+  replicaCount: 3
+  image:
+    repository: aigov/gateway
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilization: 70
+  env:
+    - name: GATEWAY_PORT
+      value: "8080"
+    - name: REDIS_URL
+      value: "redis://redis:6379"
+    - name: ADMIN_API_URL
+      value: "http://admin-api:3001"
+    - name: GEMINI_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: ai-gateway-secrets
+          key: gemini-api-key
+
+# ── Admin API (Node.js) ──
+adminApi:
+  replicaCount: 2
+  image:
+    repository: aigov/admin-api
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  port: 3001
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  env:
+    - name: PORT
+      value: "3001"
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: ai-gateway-secrets
+          key: database-url
+    - name: JWT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: ai-gateway-secrets
+          key: jwt-secret
+
+# ── Dashboard (Next.js) ──
+dashboard:
+  replicaCount: 2
+  image:
+    repository: aigov/dashboard
+    tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi
+
+# ── PostgreSQL ──
+postgresql:
+  enabled: true
+  image:
+    tag: "16-alpine"
+  auth:
+    database: aigateway
+    username: aigateway
+    existingSecret: ai-gateway-secrets
+    secretKeys:
+      adminPasswordKey: postgres-password
+  primary:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# ── Redis ──
+redis:
+  enabled: true
+  image:
+    tag: "7-alpine"
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      size: 2Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+
+# ── Ingress ──
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: gateway.yourdomain.com
+      paths:
+        - path: /v1
+          pathType: Prefix
+          service: gateway
+        - path: /api
+          pathType: Prefix
+          service: admin-api
+        - path: /
+          pathType: Prefix
+          service: dashboard
+  tls:
+    - secretName: ai-gateway-tls
+      hosts:
+        - gateway.yourdomain.com

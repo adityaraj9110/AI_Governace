@@ -1,0 +1,40 @@
+services:
+  # ============================================
+  # PostgreSQL 16
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: aigov-postgres
+    environment:
+      POSTGRES_DB: aigateway
+      POSTGRES_USER: aigateway
+      POSTGRES_PASSWORD: aigateway_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../services/admin-api/src/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ../services/admin-api/src/db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aigateway"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ============================================
+  # Redis 7
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: aigov-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  postgres_data:
